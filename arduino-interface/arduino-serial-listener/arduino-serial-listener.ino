@@ -1,61 +1,43 @@
-// // Example 1 - Receiving single characters
+#include <arduino-timer.h>
+#include <Servo.h>
 
-// char receivedChar;
-int on = 1;
-int off = 0;
-// boolean newData = false;
+// Buzzer
+int buzzerPin = 9;
+int buzzerLowTone = 1000;
+int buzzerHighTone = 2000;
 
-// void setup() {
-//     Serial.begin(9600);
-//     Serial.println("<Arduino is ready>");
-// }
+// Pusher
+Servo pushServo; // create servo object to control a servo
+int pushServoPin = 3;
 
-// void loop() {
-//     recvOneChar();
-//     showNewData();
-// }
-
-// void recvOneChar() {
-//     if (Serial.available() > 0) {
-//         receivedChar = Serial.read();
-//         newData = true;
-//     }
-// }
-
-// void showNewData() {
-//     if (newData == true) {
-//       Serial.println(receivedChar);
-//       if (on == receivedChar) {
-//         Serial.println("LED on");
-//         digitalWrite(LED_BUILTIN, HIGH);
-//       } else if (off == receivedChar) {
-//         Serial.println("LED off");
-//         digitalWrite(LED_BUILTIN, LOW);
-//       }
-      
-//       newData = false;
-//     }
-// }
-
+// serial receiver
 const byte numChars = 32;
-char receivedChars[numChars];   // an array to store the received data
-
+char receivedChars[numChars];   
 boolean newData = false;
 
-int dataNumber = 0;             // new for this version
+int receivedSerialNumber = 0;            
+
+// app states
+int ON = 1;
+int OFF = 0;
+boolean isActive = false;
+
+auto timer = timer_create_default();
+// auto timerTask = NULL;
+
+// config
+int shockInterval = 3000;
 
 void setup() {
+    pushServo.attach(pushServoPin);
+    pushServo.write(1);
+    // pushButton();
     pinMode(LED_BUILTIN, OUTPUT);
     Serial.begin(9600);
     Serial.println("<Arduino is ready>");
 }
 
-void loop() {
-    recvWithEndMarker();
-    showNewNumber();
-}
-
-void recvWithEndMarker() {
+void serialDataBuilder() {
     static byte ndx = 0;
     char endMarker = '\n';
     char rc;
@@ -78,23 +60,65 @@ void recvWithEndMarker() {
     }
 }
 
-void showNewNumber() {
+void processSerialData() {
     if (newData == true) {
-        dataNumber = 0;             // new for this version
-        dataNumber = atoi(receivedChars);   // new for this version
-        Serial.print("This just in ... ");
-        Serial.println(receivedChars);
-        Serial.print("Data as Number ... ");    // new for this version
-        Serial.println(dataNumber);     // new for this version
-
-        if (on == dataNumber) {
-          Serial.println("LED on");
-          digitalWrite(LED_BUILTIN, HIGH);
-        } else if (off == dataNumber) {
-          Serial.println("LED off");
-          digitalWrite(LED_BUILTIN, LOW);
-        }
+        receivedSerialNumber = 0;             // new for this version
+        receivedSerialNumber = atoi(receivedChars);   // new for this version
 
         newData = false;
     }
 }
+
+void playTone(int freq, int toneDelay) {
+  tone(buzzerPin, freq);
+  delay(toneDelay);
+  noTone(buzzerPin);
+}
+
+void zapWarning() {
+  playTone(buzzerLowTone, 250);
+  playTone(buzzerLowTone, 250);
+  playTone(buzzerHighTone, 750);
+}
+
+void pushButton() {
+  pushServo.attach(pushServoPin);
+  pushServo.write(1);
+  pushServo.write(40);
+  delay(300);
+  pushServo.write(1);
+  delay(300);
+  pushServo.detach();
+}
+
+void zap(void *) {
+  Serial.println("ZAP");
+  zapWarning();
+  pushButton();
+  return true;
+}
+
+void loop() {
+    timer.tick();
+    serialDataBuilder();
+    processSerialData();
+
+    if (receivedSerialNumber == ON && isActive == false) {
+      isActive = true;      
+      Serial.println("Active");
+      if (timer.empty()) {
+        timer.every(shockInterval, zap);
+      }
+      // digitalWrite(LED_BUILTIN, HIGH);
+    } else if (receivedSerialNumber == OFF && isActive == true) {
+      isActive = false;
+      Serial.println("Ded");
+      // digitalWrite(LED_BUILTIN, LOW);
+      if (!timer.empty()){
+        timer.cancel();
+      }
+    }
+}
+
+
+
