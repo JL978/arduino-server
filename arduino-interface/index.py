@@ -8,7 +8,7 @@ app = Flask(__name__)
 ser = serial.Serial("/dev/ttyACM0", 9600, timeout=5)
 
 
-@app.route("/led/on")
+@app.route("/shocker/on")
 def led_on():
     # Send a command to turn the LED on
     ser.write(b"1\n")
@@ -17,7 +17,7 @@ def led_on():
     return "LED turned on"
 
 
-@app.route("/led/off")
+@app.route("/shocker/off")
 def led_off():
     # Send a command to turn the LED off
     ser.write(b"0\n")

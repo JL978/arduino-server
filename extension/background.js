@@ -17,8 +17,26 @@ const turnShocker = (state) => {
       })
 }
 
+const scanTabs = () => {
+  chrome.tabs.query({}, (tabs) => {
+    const hasBlackListed = tabs.some((tab) => isTabBlackListed(tab, true))
 
-const handleTab = (tab) => {
+    chrome.storage.sync.get("hasBlackListed", (data) => {
+      if (data.hasBlackListed === hasBlackListed) return
+
+      chrome.storage.sync.set({ hasBlackListed }, () => {
+        if (hasBlackListed) {
+          turnShocker("on")
+        } else {
+          turnShocker("off")
+        }
+      })
+    })
+      
+  })
+}
+
+const isTabBlackListed = (tab) => {
   if (!tab.url) return
 
   let isBlackListed = false
@@ -28,25 +46,20 @@ const handleTab = (tab) => {
     }
   })
 
-  if (!isBlackListed) {
-    turnShocker("off")
-    return
-  }
-  
-  console.log("Get back to work buddy")
-  turnShocker("on")
+  return isBlackListed
 }
 
 // Listen for when the tab updates
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' ) {
-      handleTab(tab)
-    }
+    scanTabs()
 });
 
 // Listen for when active tab changes
 chrome.tabs.onActivated.addListener((activeInfo) => {
-    chrome.tabs.get(activeInfo.tabId, (tab) => {
-      handleTab(tab)
-    });
+    scanTabs()
 });
+
+// Listen for tab close
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  scanTabs()
+})
